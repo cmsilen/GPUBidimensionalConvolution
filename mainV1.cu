@@ -13,6 +13,7 @@
 #define COLUMNS_FILTER ROWS_FILTER
 #define MAX_NUMBER 255
 #define MIN_NUMBER 0
+#define THREADS_PER_BLOCK 32
 
 // depends on sigma and the coords of the filter
 __device__ double gaussianBlur(uint16_t i, uint16_t j, double sigma) {
@@ -67,14 +68,14 @@ __device__ uint8_t applyFilter(uint8_t* matrix, uint16_t x, uint16_t y, double* 
     Troppi warps -> inefficienza
 */
 
-__global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_t* results, uint16_t nThreads, uint16_t layersNum) {
+__global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_t* results, uint16_t nBlocks, uint16_t layersNum) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if(idx >= ROWS_MATRIX)
         return;
 
     double filter[ROWS_FILTER * COLUMNS_FILTER];
 
-    uint16_t rowsPerThread = ROWS_MATRIX / (nThreads * blockDim.x);
+    uint16_t rowsPerThread = ROWS_MATRIX / (nBlocks * THREADS_PER_BLOCK);
     uint16_t start = idx * rowsPerThread;
     uint16_t end = (idx + 1) * rowsPerThread;
 
@@ -95,7 +96,7 @@ uint16_t LAYERS_NUM;
 uint8_t* imgs;
 uint8_t* blurMap;
 
-double experiment(uint16_t nThreads) {
+double experiment(uint16_t nBlocks) {
     LARGE_INTEGER start, end, freq;
     QueryPerformanceFrequency(&freq);
 
@@ -107,13 +108,10 @@ double experiment(uint16_t nThreads) {
     blurMapCudaMalloc(ROWS_MATRIX, COLUMNS_FILTER, &d_blurMap);
     imgsCudaMalloc(LAYERS_NUM, ROWS_MATRIX, COLUMNS_MATRIX, &d_results, 0);
 
-    int threadsPerBlock = nThreads;
-    int blocksPerGrid = (ROWS_MATRIX + threadsPerBlock - 1) / threadsPerBlock;
-
     QueryPerformanceCounter(&start);
 
     // Lancio del kernel
-    bidimensionalConvolution<<<blocksPerGrid, threadsPerBlock>>>(d_imgs, d_blurMap, d_results, nThreads, LAYERS_NUM);
+    bidimensionalConvolution<<<nBlocks, THREADS_PER_BLOCK>>>(d_imgs, d_blurMap, d_results, nBlocks, LAYERS_NUM);
 
     //controllo errori di lancio
     cudaError_t err = cudaGetLastError();  // controlla errori di lancio kernel
@@ -135,20 +133,53 @@ double experiment(uint16_t nThreads) {
     return elapsedTime;
 }
 
+void concatStringNumber(char *str, int numero) {
+    char numStr[20];
+    sprintf(numStr, "%d", numero);
+
+    strcat(str, numStr);
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 4) {
-        printf("./main <N_THREADS> <N_IMGS> <saveData>\n");
+        printf("./main <N_BLOCKS> <N_IMGS> <saveData>\n");
         return 1; // Esce con codice di errore
     }
     // Converte gli argomenti in interi
-    int NThread = atoi(argv[1]);
+    int NBlocks = atoi(argv[1]);
     int NImgs = atoi(argv[2]);
     LAYERS_NUM = NImgs * 3;
     int saveData = atoi(argv[3]);
 
-    double elapsedTime = experiment(NThread);
+    double elapsedTime = experiment(NBlocks);
     printf("Elapsed time = %f ms\n", elapsedTime);
 
+    if(!saveData) {
+        return 0;
+    }
+
+    if(setlocale(LC_NUMERIC, "Italian_Italy.1252") == NULL) {
+        printf("Failed to set locale\n");
+        return 1;
+    }
+
+    char filename[100] = "resultsV1/executionTime_";
+    concatStringNumber(filename, NImgs);
+    strcat(filename, "IMGS.csv\0");
+    FILE* file = fopen(filename, "r");
+    int exists = file != NULL;
+    if (file != NULL) {
+        exists = 1;
+        fclose(file);
+    }
+    file = fopen(filename, "a");
+
+    if(exists == 0) {
+        fprintf(file, "Threads;NImgs;RowsFilter;executionTime\n");
+    }
+
+    fprintf(file, "%d;%d;%d;%.3f\n", NBlocks * THREADS_PER_BLOCK, NImgs, ROWS_FILTER, elapsedTime);
+    fclose(file);
     return 0;
 }
 
