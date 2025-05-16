@@ -212,7 +212,7 @@ int main(int argc, char *argv[]) {
     // Converte gli argomenti in interi
     int NBlocks = atoi(argv[1]);
     int NImgs = atoi(argv[2]);
-    LAYERS_NUM = NImgs * 3;
+    LAYERS_NUM = NImgs;
     int saveData = atoi(argv[3]);
 
     if(NBlocks * THREADS_PER_BLOCK > ROWS_MATRIX) {
