@@ -78,6 +78,8 @@ __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_
     uint16_t rowsPerThread = ROWS_MATRIX / (nBlocks * THREADS_PER_BLOCK);
     uint16_t start = idx * rowsPerThread;
     uint16_t end = (idx + 1) * rowsPerThread;
+    if(idx == nBlocks * THREADS_PER_BLOCK - 1)
+        end = ROWS_MATRIX;
 
     for(uint16_t i = 0; i < layersNum; i++) {
         for(uint16_t j = 0; j < ROWS_MATRIX; j++) {
