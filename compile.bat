@@ -12,7 +12,15 @@ set NUM=%1
 REM Costruisce il nome del file
 set FILE=mainV%NUM%.cu
 
-REM Compila con gcc
+REM pulizia file vecchi
+del main.exe
+del main.exp
+del main.lib
+del main.pdb
+del vc140.pdb
+echo pulizia completata
+
+REM Compila con nvcc
 
 IF "%~1"=="5" (
     echo compilazione con ottimizzazioni matematiche
