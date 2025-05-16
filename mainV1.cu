@@ -16,6 +16,31 @@
 #define THREADS_PER_BLOCK 32
 #define DEBUG 0
 
+__device__ double fast_exp(double x) {
+    const int k = 40; // x/k ∈ [0, 5] anche se x = 200
+    double z = x / k;
+
+    // Padé(3,3)
+    double z2 = z * z;
+    double z3 = z2 * z;
+    double num = 1.0 - z + 0.5 * z2 - z3 / 6.0;
+    double den = 1.0 + z + 0.5 * z2 + z3 / 6.0;
+    double base = num / den;
+
+    // Esponenziazione rapida base^k
+    double result = 1.0;
+    double p = base;
+    int n = k;
+
+    while (n > 0) {
+        if (n & 1) result *= p;
+        p *= p;
+        n >>= 1;
+    }
+
+    return result;
+}
+
 // depends on sigma and the coords of the filter
 __device__ double gaussianBlur(uint16_t i, uint16_t j, double sigma) {
     double denominator = 2.51 * sigma;
@@ -24,7 +49,7 @@ __device__ double gaussianBlur(uint16_t i, uint16_t j, double sigma) {
     uint16_t jt = j - COLUMNS_FILTER / 2;
 
     double exponent = -(it * it + jt * jt) / (2 * sigma * sigma);
-    return (1.0 / denominator) * ::exp(exponent);
+    return (1.0 / denominator) * fast_exp(exponent);
 }
 
 // depends on the coords of the matrix
@@ -45,13 +70,26 @@ __device__ uint8_t applyFilter(uint8_t* matrix, uint16_t x, uint16_t y, double* 
     double result = 0;
     uint16_t i, j;
 
-    for (i = 0; i < ROWS_FILTER; i++) {
-        for (j = 0; j < COLUMNS_FILTER; j++) {
-            if (x - (ROWS_FILTER / 2) + i < 0 || x - (ROWS_FILTER / 2) + i >= ROWS_MATRIX ||
-                y - (COLUMNS_FILTER / 2) + j < 0 || y - (COLUMNS_FILTER / 2) + j >= COLUMNS_MATRIX)
-                continue;
-            result += matrix[(x - (ROWS_FILTER / 2) + i) * COLUMNS_FILTER + (y - (COLUMNS_FILTER / 2) + j)] * filter[i * COLUMNS_FILTER + j];
+    uint16_t startX = 0;
+    uint16_t startY = 0;
+    uint16_t HALF_ROW = (ROWS_FILTER / 2);
+    uint16_t HALF_COLUMN = (COLUMNS_FILTER / 2);
+    if(x < HALF_ROW) startX = HALF_ROW - x;
+    if(y < HALF_COLUMN) startY = HALF_COLUMN - y;
+
+    uint16_t endX = ROWS_FILTER;
+    uint16_t endY = COLUMNS_FILTER;
+    if(x >= ROWS_MATRIX - HALF_ROW) endX = HALF_ROW + ROWS_MATRIX - x;
+    if(y >= COLUMNS_MATRIX - HALF_COLUMN) endY = HALF_COLUMN + COLUMNS_MATRIX - y;
+
+    uint16_t k = x - HALF_ROW + startX;
+    for (i = startX; i < endX; i++) {
+        uint16_t h = y - HALF_COLUMN + startY;
+        for (j = startY; j < endY; j++) {
+            result += matrix[k * COLUMNS_MATRIX + h] * filter[i * COLUMNS_FILTER + j];
+            h++;
         }
+        k++;
     }
 
     if (result > 255)
