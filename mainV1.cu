@@ -53,6 +53,20 @@ __device__ uint8_t applyFilter(uint8_t* matrix, uint16_t x, uint16_t y, double* 
     return result;
 }
 
+/*
+    SCHEDULAZIONE:
+    la gpu è composta da Streaming Multiprocessor (SM) che eseguono insiemi di 32 threads (warps).
+    Al lancio del kernel, uno SM riceve blocksPerGrid blocchi definiti in bidimensionalConvolution<<<blocksPerGrid, threadsPerBlock>>>.
+    Un blocco rimane sullo SM fino alla fine dell'elaborazione.
+    Il blocco viene diviso in warps da 32 threads. I warps vengono schedulati per l'esecuzione sullo SM.
+    Lo SM può arrivare in genere a 64 warps attivi.
+    In base al numero di threads che assegnamo per blocco, andiamo a definire il numero di warps usati per blocco.
+    Se il numero di threads per blocco non è un multiplo di 32, per ogni blocco si creerà un warp parziale (con meno di 32 threads) che andrà
+    a peggiorare l'utilizzazione dell'architettura.
+    Pochi warps -> bassa utilizzazione
+    Troppi warps -> inefficienza
+*/
+
 __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_t* results, uint16_t nThreads, uint16_t layersNum) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if(idx >= ROWS_MATRIX)
