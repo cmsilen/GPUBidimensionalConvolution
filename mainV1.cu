@@ -112,25 +112,30 @@ __device__ uint8_t applyFilter(uint8_t* matrix, uint16_t x, uint16_t y, double* 
 */
 
 __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_t* results, uint16_t nBlocks, uint16_t layersNum) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int totThreads = nBlocks * THREADS_PER_BLOCK;
-    if(idx >= ROWS_MATRIX)
-        return;
-
     double filter[ROWS_FILTER * COLUMNS_FILTER];
 
-    uint16_t rowsPerThread = ROWS_MATRIX / totThreads;
-    uint16_t start = idx * rowsPerThread + idx;
-    uint16_t end = (idx + 1) * rowsPerThread;
-    if(idx < ROWS_MATRIX % totThreads)
-        end += idx;
-    else
-        end += ROWS_MATRIX % totThreads;
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int totThreads = nBlocks * THREADS_PER_BLOCK;
 
+    if (idx >= totThreads)
+        return;
+
+    uint16_t baseRows = ROWS_MATRIX / totThreads;
+    uint16_t extraRows = ROWS_MATRIX % totThreads;
+
+    uint16_t start, end;
+
+    if (idx < extraRows) {
+        start = idx * (baseRows + 1);
+        end = start + baseRows + 1;
+    } else {
+        start = idx * baseRows + extraRows;
+        end = start + baseRows;
+    }
 
     for(uint16_t i = 0; i < layersNum; i++) {
-        for(uint16_t j = 0; j < ROWS_MATRIX; j++) {
-            for(uint16_t k = start; k < end; k++) {
+        for(uint16_t j = start; j < end; j++) {
+            for(uint16_t k = 0; k < COLUMNS_MATRIX; k++) {
                 if(blurMap[j * COLUMNS_MATRIX + k] == 0) {
                     results[i * (ROWS_MATRIX * COLUMNS_MATRIX) + j * COLUMNS_MATRIX + k] = imgs[i * (ROWS_MATRIX * COLUMNS_MATRIX) + j * COLUMNS_MATRIX + k];
                     continue;
@@ -211,7 +216,7 @@ int main(int argc, char *argv[]) {
     int saveData = atoi(argv[3]);
 
     if(NBlocks * THREADS_PER_BLOCK > ROWS_MATRIX) {
-        printf("too much number of blocks\n");
+        printf("too much number of blocks %d %d\n", NBlocks * THREADS_PER_BLOCK, ROWS_MATRIX);
         return 1;
     }
 

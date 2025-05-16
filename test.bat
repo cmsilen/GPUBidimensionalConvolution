@@ -18,12 +18,12 @@ call compile %~1
 
 for /L %%i in (1,1,60) do (
     for %%j in (1,5,10) do (
-        echo Esecuzione: main %%i threads %%j imgs
-        main %%i %%j 7 0 1
-        main %%i %%j 7 0 1
-        main %%i %%j 7 0 1
-        main %%i %%j 7 0 1
-        main %%i %%j 7 0 1
+        echo Esecuzione: main %%i blocks %%j imgs
+        main %%i %%j 1
+        main %%i %%j 1
+        main %%i %%j 1
+        main %%i %%j 1
+        main %%i %%j 1
     )
 )
 
