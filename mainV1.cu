@@ -131,6 +131,10 @@ __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_
     for(uint16_t i = 0; i < layersNum; i++) {
         for(uint16_t j = 0; j < ROWS_MATRIX; j++) {
             for(uint16_t k = start; k < end; k++) {
+                if(blurMap[j * COLUMNS_MATRIX + k] == 0) {
+                    results[i * (ROWS_MATRIX * COLUMNS_MATRIX) + j * COLUMNS_MATRIX + k] = imgs[i * (ROWS_MATRIX * COLUMNS_MATRIX) + j * COLUMNS_MATRIX + k];
+                    continue;
+                }
                 computeFilter(filter, j, k, blurMap);
                 results[i * (ROWS_MATRIX * COLUMNS_MATRIX) + j * COLUMNS_MATRIX + k] = applyFilter(imgs + i * (ROWS_MATRIX * COLUMNS_MATRIX), j, k, filter);
             }
