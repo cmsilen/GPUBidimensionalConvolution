@@ -2,9 +2,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <windows.h>
-#include <math.h>
 #include <locale.h>
 #include <cuda.h>
+#include <cuda_runtime_api.h>
 
 #define SIGMA_MAX 0.5
 #define ROWS_MATRIX 2160
@@ -14,12 +14,17 @@
 #define MAX_NUMBER 255
 #define MIN_NUMBER 0
 #define THREADS_PER_BLOCK 32
+#define DEBUG 0
 
 // depends on sigma and the coords of the filter
 __device__ double gaussianBlur(uint16_t i, uint16_t j, double sigma) {
-    double denominator = sqrt(2 * 3.14 * sigma * sigma);
-    double exponent = -(i * i + j * j) / (2 * sigma * sigma);
-    return (1.0 / denominator) * exp(exponent);
+    double denominator = 2.51 * sigma;
+
+    uint16_t it = i - ROWS_FILTER / 2;
+    uint16_t jt = j - COLUMNS_FILTER / 2;
+
+    double exponent = -(it * it + jt * jt) / (2 * sigma * sigma);
+    return (1.0 / denominator) * ::exp(exponent);
 }
 
 // depends on the coords of the matrix
@@ -70,16 +75,20 @@ __device__ uint8_t applyFilter(uint8_t* matrix, uint16_t x, uint16_t y, double* 
 
 __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_t* results, uint16_t nBlocks, uint16_t layersNum) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int totThreads = nBlocks * THREADS_PER_BLOCK;
     if(idx >= ROWS_MATRIX)
         return;
 
     double filter[ROWS_FILTER * COLUMNS_FILTER];
 
-    uint16_t rowsPerThread = ROWS_MATRIX / (nBlocks * THREADS_PER_BLOCK);
-    uint16_t start = idx * rowsPerThread;
+    uint16_t rowsPerThread = ROWS_MATRIX / totThreads;
+    uint16_t start = idx * rowsPerThread + idx;
     uint16_t end = (idx + 1) * rowsPerThread;
-    if(idx == nBlocks * THREADS_PER_BLOCK - 1)
-        end = ROWS_MATRIX;
+    if(idx < ROWS_MATRIX % totThreads)
+        end += idx;
+    else
+        end += ROWS_MATRIX % totThreads;
+
 
     for(uint16_t i = 0; i < layersNum; i++) {
         for(uint16_t j = 0; j < ROWS_MATRIX; j++) {
@@ -109,6 +118,11 @@ double experiment(uint16_t nBlocks) {
     imgsCudaMalloc(LAYERS_NUM, ROWS_MATRIX, COLUMNS_MATRIX, &d_imgs, 1);
     blurMapCudaMalloc(ROWS_MATRIX, COLUMNS_FILTER, &d_blurMap);
     imgsCudaMalloc(LAYERS_NUM, ROWS_MATRIX, COLUMNS_MATRIX, &d_results, 0);
+
+    if(DEBUG) {
+        printf("starting %d threads\n", nBlocks * THREADS_PER_BLOCK);
+        printf("rows per thread: %d\n", ROWS_MATRIX / (nBlocks * THREADS_PER_BLOCK));
+    }
 
     QueryPerformanceCounter(&start);
 
@@ -152,6 +166,11 @@ int main(int argc, char *argv[]) {
     int NImgs = atoi(argv[2]);
     LAYERS_NUM = NImgs * 3;
     int saveData = atoi(argv[3]);
+
+    if(NBlocks * THREADS_PER_BLOCK > ROWS_MATRIX) {
+        printf("too much number of blocks\n");
+        return 1;
+    }
 
     double elapsedTime = experiment(NBlocks);
     printf("Elapsed time = %f ms\n", elapsedTime);

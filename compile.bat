@@ -20,6 +20,6 @@ IF "%~1"=="5" (
     goto fine
 )
 
-nvcc -o main %FILE%
+nvcc -g -G -o main %FILE%
 
 :fine
