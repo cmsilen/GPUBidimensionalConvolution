@@ -54,15 +54,15 @@ __device__ uint8_t applyFilter(uint8_t* matrix, uint16_t x, uint16_t y, double* 
 }
 
 __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_t* results, uint16_t nThreads, uint16_t layersNum) {
-    int threadIndex = threadIdx.x;
-    if(threadIndex >= nThreads)
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if(idx >= ROWS_MATRIX)
         return;
 
     double filter[ROWS_FILTER * COLUMNS_FILTER];
 
-    uint16_t rowsPerThread = ROWS_MATRIX / nThreads;
-    uint16_t start = threadIndex * rowsPerThread;
-    uint16_t end = (threadIndex + 1) * rowsPerThread;
+    uint16_t rowsPerThread = ROWS_MATRIX / (nThreads * blockDim.x);
+    uint16_t start = idx * rowsPerThread;
+    uint16_t end = (idx + 1) * rowsPerThread;
 
     for(uint16_t i = 0; i < layersNum; i++) {
         for(uint16_t j = 0; j < ROWS_MATRIX; j++) {
@@ -93,8 +93,8 @@ double experiment(uint16_t nThreads) {
     blurMapCudaMalloc(ROWS_MATRIX, COLUMNS_FILTER, &d_blurMap);
     imgsCudaMalloc(LAYERS_NUM, ROWS_MATRIX, COLUMNS_MATRIX, &d_results, 0);
 
-    int threadsPerBlock = 256;
-    int blocksPerGrid = 1;
+    int threadsPerBlock = nThreads;
+    int blocksPerGrid = (ROWS_MATRIX + threadsPerBlock - 1) / threadsPerBlock;
 
     QueryPerformanceCounter(&start);
 
