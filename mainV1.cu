@@ -120,8 +120,8 @@ __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_
     if (idx >= totThreads)
         return;
 
-    uint16_t baseRows = ROWS_MATRIX / totThreads;
-    uint16_t extraRows = ROWS_MATRIX % totThreads;
+    uint16_t baseRows = (ROWS_MATRIX * layersNum) / totThreads;
+    uint16_t extraRows = (ROWS_MATRIX * layersNum) % totThreads;
 
     uint16_t start, end;
 
@@ -133,17 +133,15 @@ __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_
         end = start + baseRows;
     }
 
-    for(uint16_t i = 0; i < layersNum; i++) {
-        for(uint16_t j = start; j < end; j++) {
-            for(uint16_t k = 0; k < COLUMNS_MATRIX; k++) {
-                if(blurMap[j * COLUMNS_MATRIX + k] == 0) {
-                    results[i * (ROWS_MATRIX * COLUMNS_MATRIX) + j * COLUMNS_MATRIX + k] = imgs[i * (ROWS_MATRIX * COLUMNS_MATRIX) + j * COLUMNS_MATRIX + k];
-                    continue;
-                }
-
-                computeFilter(filter, j, k, blurMap);
-                results[i * (ROWS_MATRIX * COLUMNS_MATRIX) + j * COLUMNS_MATRIX + k] = applyFilter(imgs + i * (ROWS_MATRIX * COLUMNS_MATRIX), j, k, filter);
+    for(uint16_t j = start; j < end; j++) {
+        for(uint16_t k = 0; k < COLUMNS_MATRIX; k++) {
+            if(blurMap[j * COLUMNS_MATRIX + k] == 0) {
+                results[j * COLUMNS_MATRIX + k] = imgs[j * COLUMNS_MATRIX + k];
+                continue;
             }
+
+            computeFilter(filter, j % ROWS_MATRIX, k, blurMap);
+            results[j * COLUMNS_MATRIX + k] = applyFilter(imgs + (j / ROWS_MATRIX), (j % ROWS_MATRIX), k, filter);
         }
     }
 }
@@ -215,8 +213,8 @@ int main(int argc, char *argv[]) {
     LAYERS_NUM = NImgs;
     int saveData = atoi(argv[3]);
 
-    if(NBlocks * THREADS_PER_BLOCK > ROWS_MATRIX) {
-        printf("too much number of blocks %d %d\n", NBlocks * THREADS_PER_BLOCK, ROWS_MATRIX);
+    if(NBlocks * THREADS_PER_BLOCK > ROWS_MATRIX * LAYERS_NUM) {
+        printf("too much number of blocks %d %d\n", NBlocks * THREADS_PER_BLOCK, ROWS_MATRIX * LAYERS_NUM);
         return 1;
     }
 
