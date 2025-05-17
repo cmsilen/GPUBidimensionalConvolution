@@ -208,14 +208,15 @@ int main(int argc, char *argv[]) {
         return 1; // Esce con codice di errore
     }
     // Converte gli argomenti in interi
-    int NBlocks = atoi(argv[1]);
-    int NImgs = atoi(argv[2]);
+    uint16_t NBlocks = atoi(argv[1]);
+    uint16_t NImgs = atoi(argv[2]);
     LAYERS_NUM = NImgs;
-    int saveData = atoi(argv[3]);
+    uint16_t saveData = atoi(argv[3]);
+    uint16_t realNBlocks = NBlocks;
 
     if(NBlocks * THREADS_PER_BLOCK > ROWS_MATRIX * LAYERS_NUM) {
-        printf("too much number of blocks %d %d\n", NBlocks * THREADS_PER_BLOCK, ROWS_MATRIX * LAYERS_NUM);
-        return 1;
+        NBlocks = (ROWS_MATRIX * LAYERS_NUM) / THREADS_PER_BLOCK;
+        printf("thread limitati a %d\n", NBlocks);
     }
 
     double elapsedTime = experiment(NBlocks);
@@ -245,23 +246,21 @@ int main(int argc, char *argv[]) {
         fprintf(file, "Threads;NImgs;RowsFilter;executionTime\n");
     }
 
-    fprintf(file, "%d;%d;%d;%.3f\n", NBlocks * THREADS_PER_BLOCK, NImgs, ROWS_FILTER, elapsedTime);
+    fprintf(file, "%d;%d;%d;%.3f\n", realNBlocks * THREADS_PER_BLOCK, NImgs, ROWS_FILTER, elapsedTime);
     fclose(file);
     return 0;
 }
 
-int16_t g_seed = 10;
-int16_t randomNumber(int16_t min, int16_t max) {
-    g_seed = (214013*g_seed+2531011);
-    return ((g_seed>>16)&0x7FFF) % (max - min + 1) + min;
-
-    //return rand() % (max - min + 1) + min;
+static uint32_t rng_state = 123456789;
+uint8_t randomNumber() {
+    rng_state = 1664525 * rng_state + 1013904223;
+    return (uint8_t)(rng_state >> 24);
 }
 
 void fillMatrix(uint8_t* matrix, uint16_t rows, uint16_t cols) {
     for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
-            matrix[i * cols + j] = randomNumber(MIN_NUMBER, MAX_NUMBER);
+            matrix[i * cols + j] = randomNumber();
         }
     }
 }
