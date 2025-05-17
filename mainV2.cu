@@ -17,23 +17,23 @@
 #define DEBUG 0
 
 // depends on sigma and the coords of the filter
-__device__ double gaussianBlur(uint16_t i, uint16_t j, double sigma) {
-    double denominator = 2.51 * sigma;
+__device__ float gaussianBlur(uint16_t i, uint16_t j, float sigma) {
+    float denominator = 2.51 * sigma;
 
     uint16_t it = i - ROWS_FILTER / 2;
     uint16_t jt = j - COLUMNS_FILTER / 2;
 
-    double exponent = -(it * it + jt * jt) / (2 * sigma * sigma);
+    float exponent = -(it * it + jt * jt) / (2 * sigma * sigma);
     return (1.0 / denominator) * ::exp(exponent);
 }
 
 // depends on the coords of the matrix
-__device__ double sigmaFunction(uint16_t i, uint16_t j, uint8_t* blurMap) {
+__device__ float sigmaFunction(uint16_t i, uint16_t j, uint8_t* blurMap) {
     return blurMap[i * COLUMNS_MATRIX + j] * SIGMA_MAX;
 }
 
 // to compute the filter given the coords of the matrix
-__device__ void computeFilter(double* filter, uint16_t row, uint16_t col, uint8_t* blurMap) {
+__device__ void computeFilter(float* filter, uint16_t row, uint16_t col, uint8_t* blurMap) {
     for (uint16_t i = 0; i < ROWS_FILTER; i++) {
         for (uint16_t j = 0; j < COLUMNS_FILTER; j++) {
             filter[i * COLUMNS_FILTER + j] = gaussianBlur(i, j, sigmaFunction(row, col, blurMap));
@@ -41,8 +41,8 @@ __device__ void computeFilter(double* filter, uint16_t row, uint16_t col, uint8_
     }
 }
 
-__device__ uint8_t applyFilter(uint8_t* matrix, uint16_t x, uint16_t y, double* filter) {
-    double result = 0;
+__device__ uint8_t applyFilter(uint8_t* matrix, uint16_t x, uint16_t y, float* filter) {
+    float result = 0;
     uint16_t i, j;
 
     uint16_t startX = 0;
@@ -87,7 +87,7 @@ __device__ uint8_t applyFilter(uint8_t* matrix, uint16_t x, uint16_t y, double* 
 */
 
 __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_t* results, uint16_t nBlocks, uint16_t layersNum) {
-    double filter[ROWS_FILTER * COLUMNS_FILTER];
+    float filter[ROWS_FILTER * COLUMNS_FILTER];
 
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int totThreads = nBlocks * THREADS_PER_BLOCK;
@@ -95,29 +95,32 @@ __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_
     if (idx >= totThreads)
         return;
 
-    uint16_t baseRows = (ROWS_MATRIX * layersNum) / totThreads;
-    uint16_t extraRows = (ROWS_MATRIX * layersNum) % totThreads;
+    uint64_t basePixels = (ROWS_MATRIX * COLUMNS_MATRIX * layersNum) / totThreads;
+    uint64_t extraPixels = (ROWS_MATRIX * COLUMNS_MATRIX * layersNum) % totThreads;
 
-    uint16_t start, end;
+    uint64_t start, end;
 
-    if (idx < extraRows) {
-        start = idx * (baseRows + 1);
-        end = start + baseRows + 1;
+    if (idx < extraPixels) {
+        start = idx * (basePixels + 1);
+        end = start + basePixels + 1;
     } else {
-        start = idx * baseRows + extraRows;
-        end = start + baseRows;
+        start = idx * basePixels + extraPixels;
+        end = start + basePixels;
     }
 
-    for(uint16_t j = start; j < end; j++) {
-        for(uint16_t k = 0; k < COLUMNS_MATRIX; k++) {
-            if(blurMap[j * COLUMNS_MATRIX + k] == 0) {
-                results[j * COLUMNS_MATRIX + k] = imgs[j * COLUMNS_MATRIX + k];
-                continue;
-            }
-
-            computeFilter(filter, j % ROWS_MATRIX, k, blurMap);
-            results[j * COLUMNS_MATRIX + k] = applyFilter(imgs + (j / ROWS_MATRIX), (j % ROWS_MATRIX), k, filter);
+    for(uint64_t j = start; j < end; j++) {
+        if(blurMap[j] == 0) {
+            results[j] = imgs[j];
+            continue;
         }
+
+        uint64_t layer = j / ((uint64_t)ROWS_MATRIX * COLUMNS_MATRIX);
+        uint64_t rem   = j % ((uint64_t)ROWS_MATRIX * COLUMNS_MATRIX);
+        uint64_t row   = rem / COLUMNS_MATRIX;
+        uint64_t col   = rem % COLUMNS_MATRIX;
+
+        computeFilter(filter, row, col, blurMap);
+        results[j] = applyFilter(imgs + layer * ROWS_MATRIX * COLUMNS_MATRIX, row, col, filter);
     }
 }
 
@@ -128,7 +131,7 @@ uint16_t LAYERS_NUM;
 uint8_t* imgs;
 uint8_t* blurMap;
 
-double experiment(uint16_t nBlocks) {
+float experiment(uint16_t nBlocks) {
     LARGE_INTEGER start, end, freq;
     QueryPerformanceFrequency(&freq);
 
@@ -162,7 +165,7 @@ double experiment(uint16_t nBlocks) {
         printf("Errore runtime kernel: %s\n", cudaGetErrorString(errSync));
     }
 
-    double elapsedTime = (double)(end.QuadPart - start.QuadPart) / freq.QuadPart * 1000.0;
+    float elapsedTime = (float)(end.QuadPart - start.QuadPart) / freq.QuadPart * 1000.0;
 
     cudaFree(d_imgs);
     cudaFree(d_blurMap);
@@ -189,12 +192,12 @@ int main(int argc, char *argv[]) {
     uint16_t saveData = atoi(argv[3]);
     uint16_t realNBlocks = NBlocks;
 
-    if(NBlocks * THREADS_PER_BLOCK > ROWS_MATRIX * LAYERS_NUM) {
-        NBlocks = (ROWS_MATRIX * LAYERS_NUM) / THREADS_PER_BLOCK;
+    if(NBlocks * THREADS_PER_BLOCK > ROWS_MATRIX * COLUMNS_MATRIX * LAYERS_NUM) {
+        NBlocks = (ROWS_MATRIX * COLUMNS_MATRIX * LAYERS_NUM) / THREADS_PER_BLOCK;
         printf("thread limitati a %d\n", NBlocks);
     }
 
-    double elapsedTime = experiment(NBlocks);
+    float elapsedTime = experiment(NBlocks);
     printf("Elapsed time = %f ms\n", elapsedTime);
 
     if(!saveData) {
@@ -206,7 +209,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    char filename[100] = "resultsV1/executionTime_";
+    char filename[100] = "resultsV2/executionTime_";
     concatStringNumber(filename, NImgs);
     strcat(filename, "IMGS.csv\0");
     FILE* file = fopen(filename, "r");
