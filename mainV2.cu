@@ -24,7 +24,7 @@ __device__ float gaussianBlur(uint16_t i, uint16_t j, float sigma) {
     uint16_t jt = j - COLUMNS_FILTER / 2;
 
     float exponent = (it * it + jt * jt) / (2 * sigma * sigma);
-    return (1.0 / denominator) * ::exp(exponent);
+    return (1.0 / denominator) * ::__expf(exponent);
 }
 
 // depends on the coords of the matrix
@@ -276,9 +276,9 @@ void disegna_cerchio_sfumato(uint8_t* matrice, int width, int height) {
 
             if (distanza <= radius) {
                 float valore = 255.0f * (1.0f - (distanza / radius));
-                matrice[x * width + y] = (uint8_t)(valore + 0.5f); // arrotondamento
+                matrice[y * width + x] = (uint8_t)(valore + 0.5f); // arrotondamento
             } else {
-                matrice[x * width + y] = 0;
+                matrice[y * width + x] = 0;
             }
         }
     }
