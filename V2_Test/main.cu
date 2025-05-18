@@ -24,11 +24,11 @@ void concatStringNumber(char *str, int numero);
 __device__ float gaussianBlur(uint16_t i, uint16_t j, float sigma) {
     float denominator = 2.51 * sigma;
 
-    uint16_t it = i - ROWS_FILTER / 2;
-    uint16_t jt = j - COLUMNS_FILTER / 2;
+    int16_t it = i - ROWS_FILTER / 2;
+    int16_t jt = j - COLUMNS_FILTER / 2;
 
     float exponent = (it * it + jt * jt) / (2 * sigma * sigma);
-    return (1.0 / denominator) * ::__expf(exponent);
+    return (1.0 / denominator) * ::__expf(-exponent);
 }
 
 // depends on the coords of the matrix
