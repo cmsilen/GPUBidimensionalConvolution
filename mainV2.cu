@@ -109,7 +109,7 @@ __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_
     }
 
     for(uint64_t j = start; j < end; j++) {
-        if(blurMap[j] == 0) {
+        if(blurMap[j % (ROWS_MATRIX * COLUMNS_MATRIX)] == 0) {
             results[j] = imgs[j];
             continue;
         }
@@ -140,7 +140,7 @@ float experiment(uint16_t nBlocks) {
     uint8_t* d_blurMap = nullptr;
     uint8_t* d_results = nullptr;
     imgsCudaMalloc(LAYERS_NUM, ROWS_MATRIX, COLUMNS_MATRIX, &d_imgs, 1);
-    blurMapCudaMalloc(ROWS_MATRIX, COLUMNS_FILTER, &d_blurMap);
+    blurMapCudaMalloc(ROWS_MATRIX, COLUMNS_MATRIX, &d_blurMap);
     imgsCudaMalloc(LAYERS_NUM, ROWS_MATRIX, COLUMNS_MATRIX, &d_results, 0);
 
     if(DEBUG) {
