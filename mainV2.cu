@@ -23,7 +23,7 @@ __device__ float gaussianBlur(uint16_t i, uint16_t j, float sigma) {
     uint16_t it = i - ROWS_FILTER / 2;
     uint16_t jt = j - COLUMNS_FILTER / 2;
 
-    float exponent = -(it * it + jt * jt) / (2 * sigma * sigma);
+    float exponent = (it * it + jt * jt) / (2 * sigma * sigma);
     return (1.0 / denominator) * ::exp(exponent);
 }
 
