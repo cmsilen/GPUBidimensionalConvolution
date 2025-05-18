@@ -45,10 +45,10 @@ __device__ double fast_exp(double x) {
 __device__ double gaussianBlur(uint16_t i, uint16_t j, double sigma) {
     double denominator = 2.51 * sigma;
 
-    uint16_t it = i - ROWS_FILTER / 2;
-    uint16_t jt = j - COLUMNS_FILTER / 2;
+    int16_t it = i - ROWS_FILTER / 2;
+    int16_t jt = j - COLUMNS_FILTER / 2;
 
-    double exponent = -(it * it + jt * jt) / (2 * sigma * sigma);
+    double exponent = (it * it + jt * jt) / (2 * sigma * sigma);
     return (1.0 / denominator) * fast_exp(exponent);
 }
 
