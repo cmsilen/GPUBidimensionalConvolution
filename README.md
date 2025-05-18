@@ -17,17 +17,18 @@ esegue lo script di compilazione ed inizia i test
 ## Ottimizzazioni
 ### V1 -> V2
 ```c++
-__device__ double gaussianBlur(uint16_t i, uint16_t j, double sigma) {
-    double denominator = 2.51 * sigma;
+__device__ float gaussianBlur(uint16_t i, uint16_t j, float sigma) {
+    float denominator = 2.51 * sigma;
 
-    uint16_t it = i - ROWS_FILTER / 2;
-    uint16_t jt = j - COLUMNS_FILTER / 2;
+    int16_t it = i - ROWS_FILTER / 2;
+    int16_t jt = j - COLUMNS_FILTER / 2;
 
-    double exponent = -(it * it + jt * jt) / (2 * sigma * sigma);
-    return (1.0 / denominator) * ::exp(exponent);
+    float exponent = (it * it + jt * jt) / (2 * sigma * sigma);
+    return (1.0 / denominator) * ::__expf(-exponent);
 }
 ```
-Utilizzo della funzione exp di CUDA poichè ottimizzata per architetture altamente parallele
+Utilizzo della funzione __expf di CUDA poichè ottimizzata per architetture altamente parallele.\
+Meno precisa di expf ma non influisce
 ___
 ```c++
 __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_t* results, uint16_t nBlocks, uint16_t layersNum) {
