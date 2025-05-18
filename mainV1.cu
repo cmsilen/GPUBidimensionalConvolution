@@ -298,9 +298,9 @@ void disegna_cerchio_sfumato(uint8_t* matrice, int width, int height) {
 
             if (distanza <= radius) {
                 float valore = 255.0f * (1.0f - (distanza / radius));
-                matrice[x * width + y] = (uint8_t)(valore + 0.5f); // arrotondamento
+                matrice[y * width + x] = (uint8_t)(valore + 0.5f); // arrotondamento
             } else {
-                matrice[x * width + y] = 0;
+                matrice[y * width + x] = 0;
             }
         }
     }
