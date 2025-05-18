@@ -27,16 +27,11 @@ __device__ float gaussianBlur(uint16_t i, uint16_t j, float sigma) {
     return (1.0 / denominator) * ::__expf(-exponent);
 }
 
-// depends on the coords of the matrix
-__device__ float sigmaFunction(uint16_t i, uint16_t j, uint8_t* blurMap) {
-    return blurMap[i * COLUMNS_MATRIX + j] * SIGMA_MAX;
-}
-
 // to compute the filter given the coords of the matrix
-__device__ void computeFilter(float* filter, uint16_t row, uint16_t col, uint8_t* blurMap) {
+__device__ void computeFilter(float* filter, uint16_t row, uint16_t col, uint8_t blurValue) {
     for (uint16_t i = 0; i < ROWS_FILTER; i++) {
         for (uint16_t j = 0; j < COLUMNS_FILTER; j++) {
-            filter[i * COLUMNS_FILTER + j] = gaussianBlur(i, j, sigmaFunction(row, col, blurMap));
+            filter[i * COLUMNS_FILTER + j] = gaussianBlur(i, j, blurValue * SIGMA_MAX);
         }
     }
 }
@@ -109,7 +104,8 @@ __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_
     }
 
     for(uint64_t j = start; j < end; j++) {
-        if(blurMap[j % (ROWS_MATRIX * COLUMNS_MATRIX)] == 0) {
+        uint8_t blurValue = blurMap[j % (ROWS_MATRIX * COLUMNS_MATRIX)];
+        if(blurValue == 0) {
             results[j] = imgs[j];
             continue;
         }
@@ -119,7 +115,7 @@ __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_
         uint64_t row   = rem / COLUMNS_MATRIX;
         uint64_t col   = rem % COLUMNS_MATRIX;
 
-        computeFilter(filter, row, col, blurMap);
+        computeFilter(filter, row, col, blurValue);
         results[j] = applyFilter(imgs + layer * ROWS_MATRIX * COLUMNS_MATRIX, row, col, filter);
     }
 }
