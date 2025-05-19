@@ -299,7 +299,7 @@ void precomputeFilters(float** cudaPointer) {
     float* filters = (float*)malloc(ROWS_FILTER * COLUMNS_FILTER * sizeof(float) * 255);
 
     for (uint16_t i = 0; i < 255; i++) {
-        computeFilter(filters + i * (ROWS_FILTER * COLUMNS_FILTER), i);
+        computeFilter(filters + i * (ROWS_FILTER * COLUMNS_FILTER), i + 1);
     }
 
     cudaError_t err = cudaMalloc(cudaPointer, ROWS_FILTER * COLUMNS_FILTER * sizeof(float) * 255);
