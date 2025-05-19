@@ -22,7 +22,7 @@ echo pulizia completata
 
 REM Compila con nvcc
 
-IF "%~1"=="5" (
+IF "%~1"=="6" (
     echo compilazione con ottimizzazioni
     nvcc -O3 -use_fast_math -lineinfo -o main %FILE%
     goto fine
