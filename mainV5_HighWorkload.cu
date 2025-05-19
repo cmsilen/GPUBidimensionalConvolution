@@ -185,7 +185,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    char filename[100] = "resultsV4/executionTime_";
+    char filename[100] = "resultsV5_HighWorkload/executionTime_";
     concatStringNumber(filename, NImgs);
     strcat(filename, "IMGS.csv\0");
     FILE* file = fopen(filename, "r");
