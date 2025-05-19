@@ -5,6 +5,7 @@
 #include <locale.h>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#include <inttypes.h>
 
 #define SIGMA_MAX 0.5
 #define ROWS_MATRIX 2160
@@ -67,6 +68,49 @@ __device__ uint8_t applyFilter(uint8_t* matrix, uint16_t x, uint16_t y, float* f
     return result;
 }
 
+__device__ void fromLinearIndexToMatrixIndex(uint64_t linearIndex, uint64_t* layerIndex, uint64_t* rowIndex, uint64_t* columnIndex) {
+	uint64_t layer = linearIndex / ((uint64_t)ROWS_MATRIX * COLUMNS_MATRIX);
+    uint64_t rem   = linearIndex % ((uint64_t)ROWS_MATRIX * COLUMNS_MATRIX);
+    uint64_t row   = rem / COLUMNS_MATRIX;
+    uint64_t col   = rem % COLUMNS_MATRIX;
+
+	*layerIndex = layer;
+	*rowIndex = row;
+	*columnIndex = col;
+}
+
+#define MIN(a,b) (((a)<(b))?(a):(b))
+// rows in [a, b], cols in [a, b]
+__device__ void getPixelInterval(uint64_t rowA, uint64_t rowB, uint64_t colA, uint64_t colB, uint64_t* startIndex, uint64_t* endIndex) {
+    uint64_t resRowA, resRowB, resColA, resColB;
+    uint64_t HALF_FILTER = ROWS_FILTER / 2;
+
+	resRowA = (rowA < HALF_FILTER)? 0 : rowA - HALF_FILTER;
+    resRowB = MIN(rowB + HALF_FILTER, ROWS_MATRIX);
+
+    resColA = (colA < HALF_FILTER)? 0 : colA - HALF_FILTER;
+    resColB = MIN(colB + HALF_FILTER, COLUMNS_MATRIX);
+
+    *startIndex = resRowA * COLUMNS_MATRIX + resColA;
+    *endIndex = resRowB * COLUMNS_MATRIX + resColB;
+}
+
+__device__ void getShareOfPixels(int blockIdx, int threadIdx, uint16_t nBlocks, uint16_t layersNum, uint64_t* startIndex, uint64_t* endIndex) {
+	int idx = threadIdx + blockIdx * blockDim.x;
+    int totThreads = nBlocks * THREADS_PER_BLOCK;
+
+	uint64_t basePixels = (ROWS_MATRIX * COLUMNS_MATRIX * layersNum) / totThreads;
+    uint64_t extraPixels = (ROWS_MATRIX * COLUMNS_MATRIX * layersNum) % totThreads;
+
+	if (idx < extraPixels) {
+        *startIndex = idx * (basePixels + 1);
+        *endIndex = *startIndex + basePixels + 1;
+    } else {
+        *startIndex = idx * basePixels + extraPixels;
+        *endIndex = *startIndex + basePixels;
+    }
+}
+
 /*
     SCHEDULAZIONE:
     la gpu è composta da Streaming Multiprocessor (SM) che eseguono insiemi di 32 threads (warps).
@@ -83,40 +127,76 @@ __device__ uint8_t applyFilter(uint8_t* matrix, uint16_t x, uint16_t y, float* f
 
 __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_t* results, uint16_t nBlocks, uint16_t layersNum) {
     float filter[ROWS_FILTER * COLUMNS_FILTER];
+    extern __shared__ uint8_t pixels[];
 
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int totThreads = nBlocks * THREADS_PER_BLOCK;
+	// computing personal share of pixels for the convolution
+	uint64_t start, end;
+	getShareOfPixels(blockIdx.x, threadIdx.x, nBlocks, layersNum, &start, &end);
 
-    if (idx >= totThreads)
-        return;
+	// computing the share of pixels of the first thread of the block (we need just the start) for the convolution
+	uint64_t blockStart, tmp, blockEnd;
+	getShareOfPixels(blockIdx.x, 0, nBlocks, layersNum, &blockStart, &tmp);
 
-    uint64_t basePixels = (ROWS_MATRIX * COLUMNS_MATRIX * layersNum) / totThreads;
-    uint64_t extraPixels = (ROWS_MATRIX * COLUMNS_MATRIX * layersNum) % totThreads;
+	// computing the share of pixels of the last thread of the block (we need just the end) for the convolution
+	getShareOfPixels(blockIdx.x, THREADS_PER_BLOCK - 1, nBlocks, layersNum, &tmp, &blockEnd);
 
-    uint64_t start, end;
+	// indexes for the pixels assigned for the convolution in this block
+	uint64_t layerA, layerB, rowA, rowB, colA, colB;
+	fromLinearIndexToMatrixIndex(blockStart, &layerA, &rowA, &colA);
+	fromLinearIndexToMatrixIndex(blockEnd, &layerB, &rowB, &colB);
 
-    if (idx < extraPixels) {
-        start = idx * (basePixels + 1);
-        end = start + basePixels + 1;
-    } else {
-        start = idx * basePixels + extraPixels;
-        end = start + basePixels;
-    }
+	uint64_t startNeededPixels, endNeededPixels;
+
+    // computing the needed pixels (relative index to the matrix)
+	if(layerA == layerB) {
+		getPixelInterval(rowA, rowB, colA, colB, &startNeededPixels, &endNeededPixels);
+	}
+	else {
+		getPixelInterval(rowA, ROWS_MATRIX - 1, colA, COLUMNS_MATRIX - 1, &startNeededPixels, &tmp);
+		getPixelInterval(0, rowB, 0, colB, &tmp, &endNeededPixels);
+	}
+	// computing absolute index
+	startNeededPixels += layerA * ROWS_MATRIX * COLUMNS_MATRIX;
+	endNeededPixels += layerB * ROWS_MATRIX * COLUMNS_MATRIX;
+
+	// dividing pixels to load among the threads of the block
+	uint64_t startLoadPixels, endLoadPixels, baseLoadPixels, remLoadPixels;
+	baseLoadPixels = (endNeededPixels - startNeededPixels + 1) / THREADS_PER_BLOCK;
+	remLoadPixels = (endNeededPixels - startNeededPixels + 1) % THREADS_PER_BLOCK;
+	if(threadIdx.x < remLoadPixels) {
+		startLoadPixels = threadIdx.x * (baseLoadPixels + 1);
+		endLoadPixels = startLoadPixels + baseLoadPixels + 1;
+	}
+	else {
+		startLoadPixels = threadIdx.x * baseLoadPixels + remLoadPixels;
+		endLoadPixels = startLoadPixels + baseLoadPixels;
+	}
+	startLoadPixels += startNeededPixels;
+	endLoadPixels += startNeededPixels;
+
+	/*	ringrazio nvidia che ha reso possibile il print
+	if(blockIdx.x == 0) {
+		printf("%" PRIu64 " %" PRIu64 " %d\n", startLoadPixels, endLoadPixels, threadIdx.x);
+	}*/
+
+	// copying assigned needed pixels in shared memory
+	for(uint64_t i = startLoadPixels; i < endLoadPixels; i++) {
+		pixels[i - startNeededPixels] = imgs[i];
+	}
+    __syncthreads();
 
     for(uint64_t j = start; j < end; j++) {
         uint8_t blurValue = blurMap[j % (ROWS_MATRIX * COLUMNS_MATRIX)];
         if(blurValue == 0) {
-            results[j] = imgs[j];
+            results[j] = pixels[j - startNeededPixels];
             continue;
         }
 
-        uint64_t layer = j / ((uint64_t)ROWS_MATRIX * COLUMNS_MATRIX);
-        uint64_t rem   = j % ((uint64_t)ROWS_MATRIX * COLUMNS_MATRIX);
-        uint64_t row   = rem / COLUMNS_MATRIX;
-        uint64_t col   = rem % COLUMNS_MATRIX;
+		uint64_t layer, row, col;
+		fromLinearIndexToMatrixIndex(j, &layer, &row, &col);
 
         computeFilter(filter, row, col, blurValue);
-        results[j] = applyFilter(imgs + layer * ROWS_MATRIX * COLUMNS_MATRIX, row, col, filter);
+        results[j] = applyFilter(pixels + layer * ROWS_MATRIX * COLUMNS_MATRIX - startNeededPixels, row, col, filter);
     }
 }
 
@@ -144,10 +224,21 @@ float experiment(uint16_t nBlocks) {
         printf("rows per thread: %d\n", ROWS_MATRIX / (nBlocks * THREADS_PER_BLOCK));
     }
 
+    uint64_t smemSize = (LAYERS_NUM * ROWS_MATRIX * COLUMNS_MATRIX / nBlocks) + 1 + ROWS_FILTER * COLUMNS_MATRIX / 2;
+    printf("smem size: %d\n", smemSize);
+	smemSize = 49152;
+
     QueryPerformanceCounter(&start);
 
+    cudaEvent_t startC, stopC;
+    cudaEventCreate(&startC);
+    cudaEventCreate(&stopC);
+    cudaEventRecord(startC);  // Avvia il timer
     // Lancio del kernel
-    bidimensionalConvolution<<<nBlocks, THREADS_PER_BLOCK>>>(d_imgs, d_blurMap, d_results, nBlocks, LAYERS_NUM);
+    bidimensionalConvolution<<<nBlocks, THREADS_PER_BLOCK, smemSize>>>(d_imgs, d_blurMap, d_results, nBlocks, LAYERS_NUM);
+    cudaEventRecord(stopC);   // Ferma il timer
+    cudaEventSynchronize(stopC);  // Assicura che sia terminato
+
 
     //controllo errori di lancio
     cudaError_t err = cudaGetLastError();  // controlla errori di lancio kernel
@@ -162,11 +253,15 @@ float experiment(uint16_t nBlocks) {
     }
 
     float elapsedTime = (float)(end.QuadPart - start.QuadPart) / freq.QuadPart * 1000.0;
+    float cudaEx;
+    cudaEventElapsedTime(&cudaEx, startC, stopC);  // Tempo in ms
+    cudaEventDestroy(startC);
+    cudaEventDestroy(stopC);
 
     cudaFree(d_imgs);
     cudaFree(d_blurMap);
     cudaFree(d_results);
-    return elapsedTime;
+    return cudaEx;
 }
 
 void concatStringNumber(char *str, int numero) {
