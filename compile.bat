@@ -23,8 +23,8 @@ echo pulizia completata
 REM Compila con nvcc
 
 IF "%~1"=="5" (
-    echo compilazione con ottimizzazioni matematiche
-    nvcc -o main %FILE%
+    echo compilazione con ottimizzazioni
+    nvcc -O3 -use_fast_math -lineinfo -o main %FILE%
     goto fine
 )
 

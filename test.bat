@@ -15,6 +15,17 @@ set FILE=mainV%NUM%.cu
 REM Compila con gcc
 call compile %~1
 
+IF "%~1"=="4" (
+    for %%i in (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048) do (
+        for %%j in (3,15,30) do (
+            echo Esecuzione: main %%i blocks %%j imgs
+            main %%i %%j 1
+            main %%i %%j 1
+            main %%i %%j 1
+        )
+    )
+    goto fine
+)
 
 for %%i in (4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384) do (
     for %%j in (3,15,30) do (

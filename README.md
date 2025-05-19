@@ -130,3 +130,10 @@ __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_
 }
 ```
 memorizzazione del valore della blurmap per evitare doppi accessi
+
+### V3 -> V4
+spostamento dei filtri precalcolati nella memoria costante ed aumento dei thread per blocco senza aumentare i thread totali.\
+Si beneficia dalla constant memory quando più threads di un blocco leggono locazioni vicine (o le stesse) (broadcast hardware).\
+Se mettiamo i filtri in constant memory ed aumentiamo il numero di thread per blocco, la probabilità che i threads di
+un blocco leggano valori vicini in filters aumenta (in quanto il lavoro assegnato a livello di blocco aumenta).\
+Il cerchio sfumato della blurMap contiene valori vicini correlati tra di loro (cambiano poco), quindi i threads leggeranno filtri vicini tra di loro in filters
