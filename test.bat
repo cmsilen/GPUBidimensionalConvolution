@@ -27,6 +27,18 @@ IF "%~1"=="4" (
     goto fine
 )
 
+IF "%~1"=="4_HighWorkload" (
+    for %%i in (128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768) do (
+        for %%j in (30,100,200) do (
+            echo Esecuzione: main %%i blocks %%j imgs
+            main %%i %%j 1
+            main %%i %%j 1
+            main %%i %%j 1
+        )
+    )
+    goto fine
+)
+
 for %%i in (4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384) do (
     for %%j in (3,15,30) do (
         echo Esecuzione: main %%i blocks %%j imgs
