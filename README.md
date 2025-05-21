@@ -137,3 +137,14 @@ Si beneficia dalla constant memory quando più threads di un blocco leggono loca
 Se mettiamo i filtri in constant memory ed aumentiamo il numero di thread per blocco, la probabilità che i threads di
 un blocco leggano valori vicini in filters aumenta (in quanto il lavoro assegnato a livello di blocco aumenta).\
 Il cerchio sfumato della blurMap contiene valori vicini correlati tra di loro (cambiano poco), quindi i threads leggeranno filtri vicini tra di loro in filters
+
+### V4 -> V5
+si assegna un intervallo di pixel a livello di blocco, dopodichè i threads si prendono i pixel in maniera alternata:\
+thread 0 -> pixel 0\
+thread 1 -> pixel 1\
+thread 2 -> pixel 2\
+...\
+thread 255 -> pixel 255\
+poi si ricomincia il ciclo con il thread 0 che si prende il pixel 256...\
+in questo modo si riescono a fare accessi sequenziali a livello di thread vicini nel tempo.\
+I threads di un blocco richiederanno in un certo istante locazioni contigue.
