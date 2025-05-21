@@ -22,12 +22,12 @@ echo pulizia completata
 
 REM Compila con nvcc
 
-IF "%~1"=="6" (
-    echo compilazione con ottimizzazioni
-    nvcc -O3 -use_fast_math -lineinfo -o main %FILE%
+IF "%~1"=="5" (
+    echo compilazione con THREADS_PER_BLOCK=256
+    nvcc -g -G -o main %FILE% -DTHREADS_PER_BLOCK=256
     goto fine
 )
 
-nvcc -g -G -o main %FILE%
+nvcc -g -G -o main %FILE% -DTHREADS_PER_BLOCK=32
 
 :fine
