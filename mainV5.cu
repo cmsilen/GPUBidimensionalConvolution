@@ -14,7 +14,6 @@
 #define COLUMNS_FILTER ROWS_FILTER
 #define MAX_NUMBER 255
 #define MIN_NUMBER 0
-#define THREADS_PER_BLOCK 256
 #define DEBUG 0
 
 __constant__ float filters[ROWS_FILTER * COLUMNS_FILTER * 255];
@@ -168,6 +167,11 @@ int main(int argc, char *argv[]) {
     uint16_t saveData = atoi(argv[3]);
     uint16_t realNBlocks = NBlocks;
 
+#ifdef TEST_TPB
+    NBlocks = 1024 / THREADS_PER_BLOCK;
+    realNBlocks = NBlocks;
+#endif
+
     if(NBlocks * THREADS_PER_BLOCK > ROWS_MATRIX * COLUMNS_MATRIX * LAYERS_NUM) {
         NBlocks = (ROWS_MATRIX * COLUMNS_MATRIX * LAYERS_NUM) / THREADS_PER_BLOCK;
         printf("thread limitati a %d\n", NBlocks);
@@ -185,7 +189,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+#ifndef TEST_TPB
     char filename[100] = "resultsV5/executionTime_";
+#else
+    char filename[100] = "resultsV5/testTPB_";
+#endif
     concatStringNumber(filename, NImgs);
     strcat(filename, "IMGS.csv\0");
     FILE* file = fopen(filename, "r");
@@ -197,10 +205,18 @@ int main(int argc, char *argv[]) {
     file = fopen(filename, "a");
 
     if(exists == 0) {
+#ifndef TEST_TPB
         fprintf(file, "Threads;NImgs;RowsFilter;executionTime\n");
+#else
+        fprintf(file, "ThreadsPerBlock;NImgs;RowsFilter;Threads;executionTime\n");
+#endif
     }
 
+#ifndef TEST_TPB
     fprintf(file, "%d;%d;%d;%.3f\n", realNBlocks * THREADS_PER_BLOCK, NImgs, ROWS_FILTER, elapsedTime);
+#else
+    fprintf(file, "%d;%d;%d;%d;%.3f\n", THREADS_PER_BLOCK, NImgs, ROWS_FILTER, realNBlocks * THREADS_PER_BLOCK, elapsedTime);
+#endif
     fclose(file);
     return 0;
 }
