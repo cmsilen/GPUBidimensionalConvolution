@@ -204,14 +204,14 @@ int main(int argc, char *argv[]) {
 
     if(exists == 0) {
 #ifndef TEST_TPB
-        fprintf(file, "Threads;NImgs;RowsFilter;executionTime\n");
+        fprintf(file, "Blocks;NImgs;RowsFilter;executionTime\n");
 #else
         fprintf(file, "ThreadsPerBlock;NImgs;RowsFilter;Threads;executionTime\n");
 #endif
     }
 
 #ifndef TEST_TPB
-    fprintf(file, "%d;%d;%d;%.3f\n", realNBlocks * THREADS_PER_BLOCK, NImgs, ROWS_FILTER, elapsedTime);
+    fprintf(file, "%d;%d;%d;%.3f\n", realNBlocks, NImgs, ROWS_FILTER, elapsedTime);
 #else
     fprintf(file, "%d;%d;%d;%d;%.3f\n", THREADS_PER_BLOCK, NImgs, ROWS_FILTER, realNBlocks * THREADS_PER_BLOCK, elapsedTime);
 #endif
