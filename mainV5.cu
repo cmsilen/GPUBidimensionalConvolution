@@ -100,7 +100,7 @@ __global__ void bidimensionalConvolution(const uint8_t* __restrict__ imgs, const
 
 void imgsCudaMalloc(uint8_t n, uint16_t rows, uint16_t cols, uint8_t** cudaPointer, uint8_t toFill);
 void blurMapCudaMalloc(uint16_t rows, uint16_t cols, uint8_t** cudaPointer);
-void precomputeFilters(float** cudaPointer);
+void precomputeFilters();
 
 uint16_t LAYERS_NUM;
 uint8_t* imgs;
@@ -117,6 +117,7 @@ float experiment(uint16_t nBlocks) {
     imgsCudaMalloc(LAYERS_NUM, ROWS_MATRIX, COLUMNS_MATRIX, &d_imgs, 1);
     blurMapCudaMalloc(ROWS_MATRIX, COLUMNS_MATRIX, &d_blurMap);
     imgsCudaMalloc(LAYERS_NUM, ROWS_MATRIX, COLUMNS_MATRIX, &d_results, 0);
+    precomputeFilters();
 
     if(DEBUG) {
         printf("starting %d threads\n", nBlocks * THREADS_PER_BLOCK);
