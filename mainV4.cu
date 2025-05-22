@@ -35,7 +35,8 @@ __device__ uint8_t applyFilter(const uint8_t* __restrict__ matrix, uint16_t x, u
 
     for (i = startX; i < endX; i++) {
         for (j = startY; j < endY; j++) {
-            result += matrix[(x - HALF_ROW + i) * COLUMNS_MATRIX + (y - HALF_COLUMN + j)] * filter[i * COLUMNS_FILTER + j];
+            float k = filter[i * COLUMNS_FILTER + j];
+            result += matrix[(x - HALF_ROW + i) * COLUMNS_MATRIX + (y - HALF_COLUMN + j)] * k;
         }
     }
 

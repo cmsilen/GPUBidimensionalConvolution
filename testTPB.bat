@@ -45,7 +45,7 @@ for %%i in (32, 64, 128, 256, 512) do (
 )
 nvcc -g -G -o main %FILE% -DTHREADS_PER_BLOCK=1024 -DTEST_TPB -maxrregcount=48
 for %%j in (3,15,30) do (
-    echo Esecuzione: main %%i thread per block %%j imgs
+    echo Esecuzione: main 1024 thread per block %%j imgs
     main 1 %%j 1
     main 1 %%j 1
     main 1 %%j 1
