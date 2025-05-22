@@ -33,6 +33,12 @@ Infatti facendo così le prestazioni con TPB 1024 sono peggiori.
 ### V3
 Il caso TPB 32 rimane il migliore. Nessuna sincronizzazione tra threads favorisce questo caso in quanto il pù flessibile
 dal punto di vista dello scheduler quando assegna blocchi allo SM.
+### V4
+Il caso TPB 32 rimane il migliore. Nessuna sincronizzazione tra threads favorisce questo caso in quanto il pù flessibile
+dal punto di vista dello scheduler quando assegna blocchi allo SM.
+### V5
+Il caso TPB 256 è in generale il migliore. Per carichi non alti il caso TPB 512 risulta il migliore, ma per garantire più
+flessibilità allo scheduler, si opta per TPB 256, la differenza non è sostanziale.
 ___
 ## Ottimizzazioni
 ### V1 -> V2
@@ -152,11 +158,14 @@ __global__ void bidimensionalConvolution(uint8_t* imgs, uint8_t* blurMap, uint8_
 memorizzazione del valore della blurmap per evitare doppi accessi
 
 ### V3 -> V4
-spostamento dei filtri precalcolati nella memoria costante ed aumento dei thread per blocco senza aumentare i thread totali.\
-Si beneficia dalla constant memory quando più threads di un blocco leggono locazioni vicine (o le stesse) (broadcast hardware).\
-Se mettiamo i filtri in constant memory ed aumentiamo il numero di thread per blocco, la probabilità che i threads di
-un blocco leggano valori vicini in filters aumenta (in quanto il lavoro assegnato a livello di blocco aumenta).\
-Il cerchio sfumato della blurMap contiene valori vicini correlati tra di loro (cambiano poco), quindi i threads leggeranno filtri vicini tra di loro in filters
+spostamento dei filtri precalcolati nella memoria costante. Si ha la migliore efficienza quando i thread prelevano lo stesso
+filtro contemporaneamente (broadcast hardware).\
+Non siamo in grado di garantire una cosa del genere, ma se capita che due threads richiedono lo stesso filtro, allora
+migliorano le performance, altrimenti nel caso peggiore si hanno quasi le stesse performance della memoria globale.\
+Questa cosa può funzionare in quanto la blurmap non fa mai cambiamenti bruschi nei colori (cerchio sfumato), quindi possiamo
+sfruttare la correlazione di valori vicini (pensando alla matrice in quanto matrice, non come vettore).\
+Se un thread accede a blurMap\[i]\[j] ed un altro thread accede a blurMap\[i + 1]\[j], è più probabile che trovi lo stesso valore.
+Se invece accedono a locazioni lontanissime, sarà meno probabile.
 
 ### V4 -> V5
 si assegna un intervallo di pixel a livello di blocco, dopodichè i threads si prendono i pixel in maniera alternata:\
