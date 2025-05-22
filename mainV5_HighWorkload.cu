@@ -14,7 +14,6 @@
 #define COLUMNS_FILTER ROWS_FILTER
 #define MAX_NUMBER 255
 #define MIN_NUMBER 0
-#define THREADS_PER_BLOCK 256
 #define DEBUG 0
 
 __constant__ float filters[ROWS_FILTER * COLUMNS_FILTER * 255];
