@@ -20,7 +20,21 @@ del main.pdb
 del vc140.pdb
 echo pulizia completata
 
-for %%i in (32, 64, 128, 256, 512, 1024) do (
+IF "%~1"=="1" (
+    for %%i in (32, 64, 128, 256, 512, 1024) do (
+        nvcc -g -G -o main %FILE% -DTHREADS_PER_BLOCK=%%i -DTEST_TPB
+        for %%j in (3,15,30) do (
+            echo Esecuzione: main %%i thread per block %%j imgs
+            main 1 %%j 1
+            main 1 %%j 1
+            main 1 %%j 1
+        )
+    )
+    goto fine
+)
+
+REM per risolvere il problema TPB 1024 delle altre versioni
+for %%i in (32, 64, 128, 256, 512) do (
     nvcc -g -G -o main %FILE% -DTHREADS_PER_BLOCK=%%i -DTEST_TPB
     for %%j in (3,15,30) do (
         echo Esecuzione: main %%i thread per block %%j imgs
@@ -29,3 +43,12 @@ for %%i in (32, 64, 128, 256, 512, 1024) do (
         main 1 %%j 1
     )
 )
+nvcc -g -G -o main %FILE% -DTHREADS_PER_BLOCK=1024 -DTEST_TPB -maxrregcount=48
+for %%j in (3,15,30) do (
+    echo Esecuzione: main %%i thread per block %%j imgs
+    main 1 %%j 1
+    main 1 %%j 1
+    main 1 %%j 1
+)
+
+:fine

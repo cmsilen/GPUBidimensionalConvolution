@@ -14,6 +14,26 @@
 ```
 esegue lo script di compilazione ed inizia i test
 
+## TEST TPB
+### V1
+il test ha mostrato che la configurazione TPB migliore è 32.\
+il motivo è che essendo i threads completamente indipendenti, si preferisce la larghezza del blocco minore in modo tale da distribuire meglio i\
+warp totali tra tutti gli Streaming Multiprocessor.
+### V2
+nessuna differenza sostanziale tra configurazioni: leggermente migliore TPB 32.\
+impossibile usare TPB 1024 in quanto il compilatore, vedendo che filter è float, tenta di ottimizzare l'accesso mettendolo tutto nei registri.\
+Con 1024 TPB si supera ampiamente il limite di registri per blocco, quindi l'esecuzione termina prematuramente.\
+Questo non accadeva nella V1 quando filter era double in quanto il compilatore lo allocava direttamente nello stack locale.\
+Per rendere possibili i test con TPB 1024 si fa uso di questo comando di compilazione:
+```bash
+nvcc -g -G -o main mainV2.cu -DTHREADS_PER_BLOCK=1024 -DTEST_TPB -maxrregcount=48
+```
+In modo tale da evitare che il compilatore allochi tutto nei registri.\
+Infatti facendo così le prestazioni con TPB 1024 sono peggiori.
+### V3
+Il caso TPB 32 rimane il migliore. Nessuna sincronizzazione tra threads favorisce questo caso in quanto il pù flessibile
+dal punto di vista dello scheduler quando assegna blocchi allo SM.
+___
 ## Ottimizzazioni
 ### V1 -> V2
 ```c++
