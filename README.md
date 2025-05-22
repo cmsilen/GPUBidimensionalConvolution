@@ -38,7 +38,11 @@ Il caso TPB 32 rimane il migliore. Nessuna sincronizzazione tra threads favorisc
 dal punto di vista dello scheduler quando assegna blocchi allo SM.
 ### V5
 Il caso TPB 256 è in generale il migliore. Per carichi non alti il caso TPB 512 risulta il migliore, ma per garantire più
-flessibilità allo scheduler, si opta per TPB 256, la differenza non è sostanziale.
+flessibilità allo scheduler, si opta per TPB 256, la differenza non è sostanziale.\
+Con TPB 256 si possono garantire più accessi coalesced a livello di SM, poichè abbiamo accessi coalesced all'interno dello
+stesso blocco. Questo è meglio perchè la GPU riesce a fondere accessi coalesced effettuati dallo stesso SM, e non tra
+SM diversi, quindi raggruppandoli più possibile dentro uno SM, si sfrutta la coalescence.\
+Se si esagera con i TPB si andranno ad esaurire le risorse dello SM e lo scheduling sarà peggiore (caso TPB 1024).
 ___
 ## Ottimizzazioni
 ### V1 -> V2

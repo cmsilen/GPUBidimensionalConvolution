@@ -27,6 +27,11 @@ IF "%~1"=="5" (
     nvcc -g -G -o main %FILE% -DTHREADS_PER_BLOCK=256
     goto fine
 )
+IF "%~1"=="5_HighWorkload" (
+    echo compilazione con THREADS_PER_BLOCK=256
+    nvcc -g -G -o main %FILE% -DTHREADS_PER_BLOCK=256
+    goto fine
+)
 
 nvcc -g -G -o main %FILE% -DTHREADS_PER_BLOCK=32
 
