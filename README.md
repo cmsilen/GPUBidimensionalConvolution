@@ -17,8 +17,12 @@ esegue lo script di compilazione ed inizia i test
 ## TEST TPB
 ### V1
 il test ha mostrato che la configurazione TPB migliore è 32.\
-il motivo è che essendo i threads completamente indipendenti, si preferisce la larghezza del blocco minore in modo tale da distribuire meglio i\
-warp totali tra tutti gli Streaming Multiprocessor.
+il motivo è che essendo i threads completamente indipendenti, si preferisce la larghezza del blocco minore in modo tale da distribuire meglio i
+warp totali tra tutti gli Streaming Multiprocessor.\
+Inoltre molti blocchi andranno in coda perchè lo spazio sugli SM (max 32 blocchi) esaurisce (troppi blocchi), quindi ci sarà meno pressione sulla memoria in quanto i blocchi in
+coda dovranno attendere che gli altri finiscano prima di andare in esecuzione.
+Facendo così avremo molti meno thread totali per SM, quindi molte più risorse disponibili.\
+Lo stesso discorso vale per tutte le versioni tranne la v5.
 ### V2
 nessuna differenza sostanziale tra configurazioni: leggermente migliore TPB 32.\
 impossibile usare TPB 1024 in quanto il compilatore, vedendo che filter è float, tenta di ottimizzare l'accesso mettendolo tutto nei registri.\
@@ -43,6 +47,11 @@ Con TPB 256 si possono garantire più accessi coalesced a livello di SM, poichè
 stesso blocco. Questo è meglio perchè la GPU riesce a fondere accessi coalesced effettuati dallo stesso SM, e non tra
 SM diversi, quindi raggruppandoli più possibile dentro uno SM, si sfrutta la coalescence.\
 Se si esagera con i TPB si andranno ad esaurire le risorse dello SM e lo scheduling sarà peggiore (caso TPB 1024).
+L'enorme gap tra TPB 32 e TPB 64 è dovuta semplicemente dal fatto che con la configurazione del test, nel primo caso ogni
+SM ha solo un warp per SM, quindi non è in grado di nascondere la latenza per gli accessi in memoria.\
+Invece con 64 SM ogni SM ha 2 warp che può gestire per nascondere la latenza.\
+A regime rimane comunque meglio il caso TPB 256 in quanto gli accessi sono ottimizzati, più warp per SM
+
 ___
 ## Ottimizzazioni
 ### V1 -> V2
